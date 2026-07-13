@@ -1,12 +1,12 @@
 from auth_test import generate_jwt, get_installation_id, get_installation_token, get_pr_files
 from fastapi import FastAPI, Request, HTTPException
 from helper import fetch_file_content, post_review, run_eslint
+from llm_review import call_llm_review
 import uvicorn
 import hmac, hashlib, json
 from dotenv import load_dotenv
 import os
-import subprocess
-import tempfile
+
 
 load_dotenv()
 
@@ -56,8 +56,24 @@ async def webhook(request: Request):
         for f in files:
             if f["status"] == "removed" or not f["filename"].endswith(LINTABLE_EXTENSIONS):
                 continue
-            content = fetch_file_content(access_token, owner, repo, f["filename"], commit_sha)
-            messages = run_eslint(content, f["filename"])
+            try:
+                llm_issues = call_llm_review(f["filename"], f.get("patch", ""))
+            except Exception as e:
+                print(f"  {f['filename']}: LLM review skipped due to error ({e})", flush=True)
+                llm_issues = []
+            for issue in llm_issues:
+                review_comments.append({
+                    "path": f["filename"],
+                    "line": issue["line"],
+                    "side": "RIGHT",
+                    "body": f"🤖 **AI review ({issue['severity']})**: {issue['comment']}",
+                })
+            try:
+                content = fetch_file_content(access_token, owner, repo, f["filename"], commit_sha)
+                messages = run_eslint(content, f["filename"])
+            except Exception as e:
+                print(f"  {f['filename']}: lint skipped due to error ({e})", flush=True)
+                messages = []
             for m in messages:
                 review_comments.append({
                     "path": f["filename"],
@@ -65,8 +81,8 @@ async def webhook(request: Request):
                     "side": "RIGHT",
                     "body": f"**{m['ruleId']}**: {m['message']}",
                 })
-            print(f"  {f['filename']}: {len(messages)} issue(s)", flush=True)
 
+            print(f"  {f['filename']}: {len(messages)} issue(s)", flush=True)
         post_review(access_token, owner, repo, pr_number, commit_sha, review_comments)
         print(f"Posted {len(review_comments)} comment(s) to PR #{pr_number}", flush=True)
     else:

@@ -50,3 +50,15 @@
 - `OPENAI_KEY` is present in `.env` but not yet used — reserved for a
   future AI-based review step beyond plain ESLint.
 
+## Phase 3 — LLM-based review step — DONE (2026-07-13)
+
+- `llm_review.py` added: sends each changed file's diff (annotated with
+  real line numbers via `parse_diff_with_line_numbers`) to `gpt-4o-mini`,
+  prompted to flag only genuine logic/edge-case/bug issues (medium/high
+  severity) and explicitly ignore style/lint-catchable issues.
+- `app.py` now runs the LLM review alongside ESLint per file and merges
+  both into the same posted review; either step failing is caught and
+  logged independently so one doesn't block the other.
+- `.env`'s `OPENAI_KEY` was renamed to `OPENAI_API_KEY` to match what
+  `llm_review.py` reads; `requirements.txt` updated with `openai`.
+
