@@ -30,5 +30,23 @@
   delivery. Confirmed end-to-end with a real PR event (PR #2) processed
   with `200 OK`.
 
-## Phase 2 — not yet defined in the build guide
+## Phase 2 — App-auth flow + automated ESLint review — DONE (2026-07-13)
+
+- `auth_test.py` added: generates a JWT from the App's private key
+  (`PRIVATE_KEY_PATH`, `GITHUB_APP_ID`), exchanges it for an installation
+  access token, and fetches a PR's changed files.
+- `helper.py` added: fetches file content at a given commit (with retry/
+  backoff on 5xx), runs it through ESLint (`eslint-baseline.json`, TS/React
+  config) via a temp file + `npx eslint`, and posts results as a single PR
+  review with inline comments.
+- `app.py` webhook handler now drives the full pipeline on `pull_request`
+  `opened`/`synchronize`: install-token exchange → fetch changed lintable
+  files (`.ts`/`.tsx`/`.js`/`.jsx`) → lint → post review comments.
+- Added `package.json` / ESLint toolchain (`node_modules/` gitignored) and
+  populated `requirements.txt` (fastapi, uvicorn, python-dotenv, requests,
+  PyJWT, cryptography) — was previously committed empty.
+- Added `README.md` documenting setup, required `.env` vars, and the
+  review pipeline.
+- `OPENAI_KEY` is present in `.env` but not yet used — reserved for a
+  future AI-based review step beyond plain ESLint.
 
